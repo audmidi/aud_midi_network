@@ -85,7 +85,10 @@ sandbox: `com.apple.security.network.client` and
 access. Android: `INTERNET`, `CHANGE_WIFI_MULTICAST_STATE`,
 `ACCESS_WIFI_STATE` and a `MulticastLock` for mDNS. Windows: a firewall
 prompt for the UDP ports; MSIX needs `internetClient` and
-`privateNetworkClientServer`. Linux sandboxes: Snap `network` and
+`privateNetworkClientServer`. On the Windows machine of ticket 38 a Dart
+process lost most UDP datagrams it sent, and `multicast_dns` could not join
+its group; until ticket 39 settles both, the tests that need every datagram
+or multicast skip on Windows. Linux sandboxes: Snap `network` and
 `avahi-control`, Flatpak `--system-talk-name=org.freedesktop.Avahi`.
 
 See the plan in [aud_midi_pm](https://github.com/audmidi/aud_midi_pm/blob/main/doc/2026-Q4/tickets/2026-10-06-aud_midi_01-initial-midi-implementation.md).
