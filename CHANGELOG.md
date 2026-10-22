@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Bind UDP ports exclusively on Windows
+
 ## 0.1.1 - 2026-10-12
 
 ### Added

@@ -38,9 +38,8 @@ void main() {
     return socket;
   }
 
-  Future<RawDatagramSocket> open({InternetAddress? address}) async => watch(
-    await RawDatagramSocket.bind(address ?? InternetAddress.loopbackIPv4, 0),
-  );
+  Future<RawDatagramSocket> open({InternetAddress? address}) async =>
+      watch(await midiBindUdp(address ?? InternetAddress.loopbackIPv4, 0));
 
   Future<List<RawDatagramSocket>> openPair() async => [
     for (final socket in await midiBindAdjacent(
@@ -132,43 +131,55 @@ void main() {
     );
 
     group('blocked, dropWhere', () {
-      test('drop datagrams', () async {
-        final target = await open();
-        final proxy = await startProxy(target);
-        final client = await open();
-        proxy.blocked = true;
-        client.send([1], proxy.address, proxy.port);
-        await waitFor(target, 1, timeout: const Duration(milliseconds: 100));
-        expect(inboxes[target], isEmpty);
-        proxy
-          ..blocked = false
-          ..dropWhere = (index, toTarget, data) =>
-              index == 0 && toTarget && data.first == 9;
-        client
-          ..send([9], proxy.address, proxy.port)
-          ..send([8], proxy.address, proxy.port);
-        final received = await waitFor(target, 1);
-        expect(received.map((d) => d.data.first), equals([8]));
-        expect(proxy.dropped, 2);
-      });
+      test(
+        'drop datagrams',
+        () async {
+          final target = await open();
+          final proxy = await startProxy(target);
+          final client = await open();
+          proxy.blocked = true;
+          client.send([1], proxy.address, proxy.port);
+          await waitFor(target, 1, timeout: const Duration(milliseconds: 100));
+          expect(inboxes[target], isEmpty);
+          proxy
+            ..blocked = false
+            ..dropWhere = (index, toTarget, data) =>
+                index == 0 && toTarget && data.first == 9;
+          client
+            ..send([9], proxy.address, proxy.port)
+            ..send([8], proxy.address, proxy.port);
+          final received = await waitFor(target, 1);
+          expect(received.map((d) => d.data.first), equals([8]));
+          expect(proxy.dropped, 2);
+        },
+        skip: Platform.isWindows
+            ? 'A Dart process loses UDP datagrams on Windows (ticket 39)'
+            : null,
+      );
     });
 
     group('impairment', () {
-      test('loses and duplicates datagrams', () async {
-        final target = await open();
-        final proxy = await startProxy(target);
-        final client = await open();
-        proxy.impairment = const MidiNetworkImpairment(loss: 1);
-        client.send([1], proxy.address, proxy.port);
-        await waitFor(target, 1, timeout: const Duration(milliseconds: 100));
-        expect(proxy.dropped, 1);
-        proxy.impairment = const MidiNetworkImpairment(duplicate: 1);
-        client.send([2], proxy.address, proxy.port);
-        final received = await waitFor(target, 2);
-        expect(received.map((d) => d.data.first), equals([2, 2]));
-        expect(proxy.duplicated, 1);
-        expect(proxy.delivered, 2);
-      });
+      test(
+        'loses and duplicates datagrams',
+        () async {
+          final target = await open();
+          final proxy = await startProxy(target);
+          final client = await open();
+          proxy.impairment = const MidiNetworkImpairment(loss: 1);
+          client.send([1], proxy.address, proxy.port);
+          await waitFor(target, 1, timeout: const Duration(milliseconds: 100));
+          expect(proxy.dropped, 1);
+          proxy.impairment = const MidiNetworkImpairment(duplicate: 1);
+          client.send([2], proxy.address, proxy.port);
+          final received = await waitFor(target, 2);
+          expect(received.map((d) => d.data.first), equals([2, 2]));
+          expect(proxy.duplicated, 1);
+          expect(proxy.delivered, 2);
+        },
+        skip: Platform.isWindows
+            ? 'A Dart process loses UDP datagrams on Windows (ticket 39)'
+            : null,
+      );
 
       test('lets later datagrams overtake a reordered one', () async {
         final target = await open();

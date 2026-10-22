@@ -141,27 +141,33 @@ void main() {
         expect(client.queries, equals(['12 $apple.local']));
       });
 
-      test('browses the real network', () async {
-        final real = MidiNetworkBrowser(
-          lookupTimeout: const Duration(milliseconds: 300),
-        );
-        expect(real.queryInterval, const Duration(seconds: 5));
-        expect(real.missedRounds, 3);
-        expect(real.lookupTimeout, const Duration(milliseconds: 300));
-        Object? outcome;
-        try {
-          outcome = await real
-              .browse(MidiNetworkHostInfo.networkMidi2ServiceType)
-              .first
-              .timeout(const Duration(seconds: 10));
-        } on SocketException catch (e) {
-          outcome = e;
-        }
-        expect(
-          outcome,
-          anyOf(isA<List<MidiNetworkHostInfo>>(), isA<SocketException>()),
-        );
-      });
+      test(
+        'browses the real network',
+        () async {
+          final real = MidiNetworkBrowser(
+            lookupTimeout: const Duration(milliseconds: 300),
+          );
+          expect(real.queryInterval, const Duration(seconds: 5));
+          expect(real.missedRounds, 3);
+          expect(real.lookupTimeout, const Duration(milliseconds: 300));
+          Object? outcome;
+          try {
+            outcome = await real
+                .browse(MidiNetworkHostInfo.networkMidi2ServiceType)
+                .first
+                .timeout(const Duration(seconds: 10));
+          } on SocketException catch (e) {
+            outcome = e;
+          }
+          expect(
+            outcome,
+            anyOf(isA<List<MidiNetworkHostInfo>>(), isA<SocketException>()),
+          );
+        },
+        skip: Platform.isWindows
+            ? 'joinMulticast of multicast_dns fails on Windows (ticket 39)'
+            : null,
+      );
     });
   });
 }
