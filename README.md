@@ -49,6 +49,10 @@ Windows and Android, without Flutter.
 - **Discovery**: `MidiNetworkBrowser` queries `_apple-midi._udp` and
   `_midi2._udp` with `multicast_dns` (PTR → SRV → A/AAAA). Advertising
   goes through a `MidiServiceAdvertiser` of an OS backend.
+- **Ports**: `midiBindAdjacent` binds the control and the data port next
+  to each other, `midiBindUdp` one port that no other socket shares - on
+  Windows without SO_REUSEADDR, with which a second socket would take a
+  port over that is taken.
 - **Tests**: `MidiLossyUdpProxy` forwards UDP between endpoints with
   seeded loss, burst loss, reordering, duplication and delay.
 

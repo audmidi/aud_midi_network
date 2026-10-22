@@ -6,6 +6,7 @@
 
 - Bind UDP ports exclusively on Windows
 - Document the Windows support
+- Document the Windows behavior in both languages
 
 ## 0.1.1 - 2026-10-12
 
