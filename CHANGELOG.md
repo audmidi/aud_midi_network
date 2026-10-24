@@ -2,17 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Add an example of two AppleMIDI sessions
+
 ### Changed
 
 - Bind UDP ports exclusively on Windows
 - Document the Windows support
 - Document the Windows behavior in both languages
 - Bind UDP ports exclusively on Windows
-
-midiBindUdp binds without SO_REUSEADDR on Windows, so a taken port fails
-The adopt test takes a data port that is not adjacent
-Tests that need every UDP datagram or multicast skip on Windows (ticket 39)
-Mark code reached only by tests skipped on Windows as coverage-ignored (ticket 39)
 
 ## 0.1.1 - 2026-10-12
 
