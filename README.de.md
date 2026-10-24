@@ -52,6 +52,10 @@ Windows und Android, ohne Flutter.
 - **Discovery**: `MidiNetworkBrowser` fragt `_apple-midi._udp` und
   `_midi2._udp` mit `multicast_dns` ab (PTR → SRV → A/AAAA). Advertising
   läuft über einen `MidiServiceAdvertiser` eines OS-Backends.
+- **Ports**: `midiBindAdjacent` bindet Kontroll- und Datenport
+  nebeneinander, `midiBindUdp` einen Port, den kein anderer Socket teilt -
+  unter Windows ohne SO_REUSEADDR, mit dem ein zweiter Socket einen belegten
+  Port übernehmen würde.
 - **Tests**: `MidiLossyUdpProxy` leitet UDP zwischen Endpunkten weiter, mit
   geseedetem Verlust, Burst-Verlust, Umordnung, Duplikaten und Verzögerung.
 
@@ -89,6 +93,10 @@ Zugriff aufs lokale Netzwerk. Android: `INTERNET`,
 `CHANGE_WIFI_MULTICAST_STATE`, `ACCESS_WIFI_STATE` und ein
 `MulticastLock` für mDNS. Windows: eine Firewall-Abfrage für die
 UDP-Ports; MSIX braucht `internetClient` und `privateNetworkClientServer`.
+Auf dem Windows-Rechner von Ticket 38 verlor ein Dart-Prozess die meisten
+UDP-Datagramme, die er sendete, und `multicast_dns` konnte seiner Gruppe
+nicht beitreten; bis Ticket 39 beides klärt, überspringen die Tests, die
+jedes Datagramm oder Multicast brauchen, unter Windows.
 Linux-Sandboxes: Snap `network` und `avahi-control`, Flatpak
 `--system-talk-name=org.freedesktop.Avahi`.
 

@@ -135,10 +135,7 @@ void main() {
       });
 
       test('bind the requested port', () async {
-        final probe = await RawDatagramSocket.bind(
-          InternetAddress.loopbackIPv4,
-          0,
-        );
+        final probe = await midiBindUdp(InternetAddress.loopbackIPv4, 0);
         final port = probe.port;
         probe.close();
         final session = await retryBind(() => start('S', port: port));
@@ -215,10 +212,7 @@ void main() {
       });
 
       test('fails when nobody answers', () async {
-        final silent = await RawDatagramSocket.bind(
-          InternetAddress.loopbackIPv4,
-          0,
-        );
+        final silent = await midiBindUdp(InternetAddress.loopbackIPv4, 0);
         sockets.add(silent);
         final client = await start('Client');
         final connection = await client.connect(
@@ -306,52 +300,57 @@ void main() {
     });
 
     group('peers without session', () {
-      test('get stateless answers', () async {
-        final host = await start('Host');
-        final peer = await RawDatagramSocket.bind(
-          InternetAddress.loopbackIPv4,
-          0,
-        );
-        sockets.add(peer);
-        final answers = <List<MidiNetworkMidi2Command>>[];
-        peer.listen((event) {
-          final datagram = event == RawSocketEvent.read ? peer.receive() : null;
-          if (datagram != null) {
-            answers.add(MidiNetworkMidi2Command.decodePacket(datagram.data));
-          }
-        });
-        void send(List<MidiNetworkMidi2Command> commands) => peer.send(
-          MidiNetworkMidi2Command.encodePacket(commands),
-          InternetAddress.loopbackIPv4,
-          host.port,
-        );
-        peer.send([1, 2, 3, 4], InternetAddress.loopbackIPv4, host.port);
-        send([MidiNetworkMidi2UnknownCommand(code: 0x55)]);
-        send([
-          const MidiNetworkMidi2Ping(pingId: 5),
-          const MidiNetworkMidi2Bye(reason: 1),
-          MidiNetworkMidi2InvitationWithAuthentication(
-            digest: List.filled(32, 0),
-          ),
-          MidiNetworkMidi2UmpData(sequenceNumber: 0),
-          const MidiNetworkMidi2SessionReset(),
-        ]);
-        await eventually(() => answers.isNotEmpty);
-        expect(
-          answers.single,
-          equals([
-            const MidiNetworkMidi2PingReply(pingId: 5),
-            const MidiNetworkMidi2ByeReply(),
-            const MidiNetworkMidi2Bye(
-              reason: MidiNetworkMidi2Bye.reasonMissingPriorInvitation,
+      test(
+        'get stateless answers',
+        () async {
+          final host = await start('Host');
+          final peer = await midiBindUdp(InternetAddress.loopbackIPv4, 0);
+          sockets.add(peer);
+          final answers = <List<MidiNetworkMidi2Command>>[];
+          peer.listen((event) {
+            final datagram = event == RawSocketEvent.read
+                ? peer.receive()
+                : null;
+            if (datagram != null) {
+              answers.add(MidiNetworkMidi2Command.decodePacket(datagram.data));
+            }
+          });
+          void send(List<MidiNetworkMidi2Command> commands) => peer.send(
+            MidiNetworkMidi2Command.encodePacket(commands),
+            InternetAddress.loopbackIPv4,
+            host.port,
+          );
+          peer.send([1, 2, 3, 4], InternetAddress.loopbackIPv4, host.port);
+          send([MidiNetworkMidi2UnknownCommand(code: 0x55)]);
+          send([
+            const MidiNetworkMidi2Ping(pingId: 5),
+            const MidiNetworkMidi2Bye(reason: 1),
+            MidiNetworkMidi2InvitationWithAuthentication(
+              digest: List.filled(32, 0),
             ),
-            const MidiNetworkMidi2Bye(
-              reason: MidiNetworkMidi2Bye.reasonSessionNotEstablished,
-            ),
-          ]),
-        );
-        expect(host.connections, isEmpty);
-      });
+            MidiNetworkMidi2UmpData(sequenceNumber: 0),
+            const MidiNetworkMidi2SessionReset(),
+          ]);
+          await eventually(() => answers.isNotEmpty);
+          expect(
+            answers.single,
+            equals([
+              const MidiNetworkMidi2PingReply(pingId: 5),
+              const MidiNetworkMidi2ByeReply(),
+              const MidiNetworkMidi2Bye(
+                reason: MidiNetworkMidi2Bye.reasonMissingPriorInvitation,
+              ),
+              const MidiNetworkMidi2Bye(
+                reason: MidiNetworkMidi2Bye.reasonSessionNotEstablished,
+              ),
+            ]),
+          );
+          expect(host.connections, isEmpty);
+        },
+        skip: Platform.isWindows
+            ? 'A Dart process loses UDP datagrams on Windows (ticket 39)'
+            : null,
+      );
     });
 
     group('disconnect(host)', () {
@@ -381,50 +380,58 @@ void main() {
     });
 
     group('under loss', () {
-      test('repairs loss with error correction and retransmission', () async {
-        final host = await start(
-          'Host',
-          settings: const MidiNetworkMidi2Settings(
-            missedPingLimit: 20,
-            retransmitAttempts: 6,
-          ),
-        );
-        final client = await start(
-          'Client',
-          settings: const MidiNetworkMidi2Settings(missedPingLimit: 20),
-        );
-        final atHost = collect(host);
-        final losses = <MidiNetworkLoss>[];
-        host.losses.listen(losses.add);
-        final proxy = await MidiLossyUdpProxy.start(
-          target: InternetAddress.loopbackIPv4,
-          targetPort: host.port,
-          seed: 7,
-        );
-        proxies.add(proxy);
-        final connection = await client.connect(hostOf(host, port: proxy.port));
-        proxy.impairment = const MidiNetworkImpairment(
-          loss: 0.1,
-          burstStart: 0.03,
-          burstEnd: 0.4,
-          reorder: 0.05,
-          duplicate: 0.05,
-        );
-        final sent = <int>[];
-        for (var i = 0; i < 300; i++) {
-          sent.add(note(i));
-          await connection.send(ump([note(i)]));
-          if (i % 10 == 9) {
-            await Future<void>.delayed(const Duration(milliseconds: 2));
+      test(
+        'repairs loss with error correction and retransmission',
+        () async {
+          final host = await start(
+            'Host',
+            settings: const MidiNetworkMidi2Settings(
+              missedPingLimit: 20,
+              retransmitAttempts: 6,
+            ),
+          );
+          final client = await start(
+            'Client',
+            settings: const MidiNetworkMidi2Settings(missedPingLimit: 20),
+          );
+          final atHost = collect(host);
+          final losses = <MidiNetworkLoss>[];
+          host.losses.listen(losses.add);
+          final proxy = await MidiLossyUdpProxy.start(
+            target: InternetAddress.loopbackIPv4,
+            targetPort: host.port,
+            seed: 7,
+          );
+          proxies.add(proxy);
+          final connection = await client.connect(
+            hostOf(host, port: proxy.port),
+          );
+          proxy.impairment = const MidiNetworkImpairment(
+            loss: 0.1,
+            burstStart: 0.03,
+            burstEnd: 0.4,
+            reorder: 0.05,
+            duplicate: 0.05,
+          );
+          final sent = <int>[];
+          for (var i = 0; i < 300; i++) {
+            sent.add(note(i));
+            await connection.send(ump([note(i)]));
+            if (i % 10 == 9) {
+              await Future<void>.delayed(const Duration(milliseconds: 2));
+            }
           }
-        }
-        await eventually(() => atHost.length == sent.length);
-        expect(atHost, equals(sent));
-        expect(losses, isEmpty);
-        expect(proxy.dropped, greaterThan(10));
-        final stats = (host.connections.single).lossStats;
-        expect(stats.packetsLost, stats.packetsRecovered);
-      });
+          await eventually(() => atHost.length == sent.length);
+          expect(atHost, equals(sent));
+          expect(losses, isEmpty);
+          expect(proxy.dropped, greaterThan(10));
+          final stats = (host.connections.single).lossStats;
+          expect(stats.packetsLost, stats.packetsRecovered);
+        },
+        skip: Platform.isWindows
+            ? 'A Dart process loses UDP datagrams on Windows (ticket 39)'
+            : null,
+      );
 
       test('reports what the error correction cannot repair', () async {
         final host = await start(

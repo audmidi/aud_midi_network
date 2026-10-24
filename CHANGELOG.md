@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.2 - 2026-10-24
+
+### Added
+
+- Add an example of two AppleMIDI sessions
+
+### Changed
+
+- Bind UDP ports exclusively on Windows
+- Document the Windows support
+- Document the Windows behavior in both languages
+- Bind UDP ports exclusively on Windows
+
 ## 0.1.1 - 2026-10-12
 
 ### Added

@@ -113,10 +113,7 @@ void main() {
       MidiBytesPacket(bytes: MidiBytes(data), time: clock.now());
 
   Future<RawDatagramSocket> openSocket() async {
-    final socket = await RawDatagramSocket.bind(
-      InternetAddress.loopbackIPv4,
-      0,
-    );
+    final socket = await midiBindUdp(InternetAddress.loopbackIPv4, 0);
     sockets.add(socket);
     return socket;
   }
@@ -327,71 +324,88 @@ void main() {
     });
 
     group('datagrams', () {
-      test('ignore what is no session command and adopt data ports', () async {
-        final responder = await start('Responder');
-        final control = await openSocket();
-        final data = await openSocket();
-        final answers = <(int, MidiAppleMidiCommand)>[];
-        for (final socket in [control, data]) {
-          socket.listen((event) {
-            final datagram = event == RawSocketEvent.read
-                ? socket.receive()
-                : null;
-            if (datagram != null) {
-              answers.add((
-                socket.port,
-                MidiAppleMidiCommand.decode(datagram.data),
-              ));
-            }
-          });
-        }
-        void send(RawDatagramSocket from, List<int> datagram, int port) =>
-            from.send(datagram, InternetAddress.loopbackIPv4, port);
-        const invitation = MidiAppleMidiInvitation(
-          token: 9,
-          ssrc: 0x77,
-          name: 'Raw',
-        );
-        send(control, [0x80, 0x61, 0, 1], responder.port);
-        send(control, [0xFF, 0xFF, 0x58, 0x58], responder.port);
-        send(
-          control,
-          const MidiAppleMidiEndSession(token: 9, ssrc: 1).encode(),
-          responder.port,
-        );
-        send(data, [0x80, 0x61, 0, 1], responder.dataPort);
-        send(data, [0xFF, 0xFF, 0x58, 0x58], responder.dataPort);
-        send(control, invitation.encode(), responder.port);
-        await eventually(() => answers.isNotEmpty);
-        send(
-          data,
-          const MidiAppleMidiInvitation(token: 9, ssrc: 0x55).encode(),
-          responder.dataPort,
-        );
-        send(data, invitation.encode(), responder.dataPort);
-        send(
-          data,
-          MidiAppleMidiSync(
+      test(
+        'ignore what is no session command and adopt data ports',
+        () async {
+          final responder = await start('Responder');
+          final control = await openSocket();
+          // A data port next to the control port is the one the session
+          // assumes and adopts without an invitation; Windows hands out ports
+          // in order and picks it, so another one is taken (ticket 38).
+          var data = await openSocket();
+          while (data.port == control.port + 1) {
+            final next = await openSocket();
+            data.close();
+            data = next;
+          }
+          final answers = <(int, MidiAppleMidiCommand)>[];
+          for (final socket in [control, data]) {
+            socket.listen((event) {
+              final datagram = event == RawSocketEvent.read
+                  ? socket.receive()
+                  : null;
+              if (datagram != null) {
+                answers.add((
+                  socket.port,
+                  MidiAppleMidiCommand.decode(datagram.data),
+                ));
+              }
+            });
+          }
+          void send(RawDatagramSocket from, List<int> datagram, int port) =>
+              from.send(datagram, InternetAddress.loopbackIPv4, port);
+          const invitation = MidiAppleMidiInvitation(
+            token: 9,
             ssrc: 0x77,
-            count: 0,
-            timestamps: const [5, 0, 0],
-          ).encode(),
-          responder.dataPort,
-        );
-        await eventually(() => answers.length >= 3);
-        expect(
-          [for (final (port, command) in answers) (port, command.runtimeType)],
-          equals([
-            (control.port, MidiAppleMidiInvitationAccepted),
-            (data.port, MidiAppleMidiInvitationAccepted),
-            (data.port, MidiAppleMidiSync),
-          ]),
-        );
-        expect(
-          responder.connections.single.state,
-          MidiNetworkConnectionState.connected,
-        );
-      });
+            name: 'Raw',
+          );
+          send(control, [0x80, 0x61, 0, 1], responder.port);
+          send(control, [0xFF, 0xFF, 0x58, 0x58], responder.port);
+          send(
+            control,
+            const MidiAppleMidiEndSession(token: 9, ssrc: 1).encode(),
+            responder.port,
+          );
+          send(data, [0x80, 0x61, 0, 1], responder.dataPort);
+          send(data, [0xFF, 0xFF, 0x58, 0x58], responder.dataPort);
+          send(control, invitation.encode(), responder.port);
+          await eventually(() => answers.isNotEmpty);
+          send(
+            data,
+            const MidiAppleMidiInvitation(token: 9, ssrc: 0x55).encode(),
+            responder.dataPort,
+          );
+          send(data, invitation.encode(), responder.dataPort);
+          send(
+            data,
+            MidiAppleMidiSync(
+              ssrc: 0x77,
+              count: 0,
+              timestamps: const [5, 0, 0],
+            ).encode(),
+            responder.dataPort,
+          );
+          await eventually(() => answers.length >= 3);
+          expect(
+            [
+              for (final (port, command) in answers)
+                (port, command.runtimeType),
+            ],
+            equals([
+              (control.port, MidiAppleMidiInvitationAccepted),
+              (data.port, MidiAppleMidiInvitationAccepted),
+              (data.port, MidiAppleMidiSync),
+            ]),
+          );
+          expect(
+            responder.connections.single.state,
+            MidiNetworkConnectionState.connected,
+          );
+        },
+        skip: Platform.isWindows
+            ? 'A Dart process loses UDP datagrams on Windows (ticket 39)'
+            : null,
+      );
     });
 
     group('under failures', () {
