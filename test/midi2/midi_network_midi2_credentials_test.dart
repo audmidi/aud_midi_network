@@ -19,9 +19,8 @@ void main() {
       test('matches the example of M2-124-UM 6.9', () {
         expect(
           hex(
-            const MidiNetworkMidi2SharedSecret(
-              '5483',
-            ).digest(ascii.encode(r'nUWrn*@#$hjfwnkL')),
+            const MidiNetworkMidi2SharedSecret('5483')
+                .digest(ascii.encode(r'nUWrn*@#$hjfwnkL')),
           ),
           '676EBE82587CECA8F82FC333D787951EEC2B00AD31613CC4DB18CF27373AFB82',
         );

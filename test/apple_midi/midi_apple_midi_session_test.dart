@@ -286,9 +286,8 @@ void main() {
             allowedPeers: {'Friend'},
           ),
         );
-        final stranger = await (await start(
-          'Stranger',
-        )).connect(hostOf(responder));
+        final stranger = await (await start('Stranger'))
+            .connect(hostOf(responder));
         expect(stranger.state, MidiNetworkConnectionState.failed);
         expect(stranger.endReason, 'the peer rejected the invitation');
         final friend = await (await start('Friend')).connect(hostOf(responder));

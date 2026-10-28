@@ -67,7 +67,7 @@ void main() {
             IPAddressResourceRecord(
               'studio.local',
               0,
-              address: InternetAddress('192.168.1.10'),
+              address: InternetAddress('192.0.2.10'),
             ),
           )
           ..add(
@@ -82,8 +82,8 @@ void main() {
           hosts,
           equals([
             host('Laptop', 'fe80::1', 5006),
-            host('Odd', '192.168.1.10', 5008),
-            host('Studio', '192.168.1.10', 5004),
+            host('Odd', '192.0.2.10', 5008),
+            host('Studio', '192.0.2.10', 5004),
           ]),
         );
         expect(client.queries.first, '12 $apple.local');
@@ -95,13 +95,13 @@ void main() {
           IPAddressResourceRecord(
             'a.local',
             0,
-            address: InternetAddress('10.0.0.1'),
+            address: InternetAddress('192.0.2.1'),
           ),
         );
         final reports = <List<MidiNetworkHostInfo>>[];
         final subscription = browser().browse(apple).listen(reports.add);
         await _until(() => reports.isNotEmpty);
-        expect(reports.single, equals([host('A', '10.0.0.1', 5004)]));
+        expect(reports.single, equals([host('A', '192.0.2.1', 5004)]));
         await _until(() => client.rounds >= 3);
         expect(reports.length, 1);
         client.clear();

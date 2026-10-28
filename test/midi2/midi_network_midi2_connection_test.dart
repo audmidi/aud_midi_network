@@ -374,9 +374,9 @@ void main() {
           MidiNetworkMidi2Invitation.capabilityUserAuthentication,
         );
         expect(
-          sentOf<MidiNetworkMidi2InvitationWithUserAuthentication>(
-            toHost,
-          ).single.userName,
+          sentOf<MidiNetworkMidi2InvitationWithUserAuthentication>(toHost)
+              .single
+              .userName,
           'Rosa',
         );
       });
@@ -391,9 +391,8 @@ void main() {
         expect(p.client.endReason, 'the host rejected the credentials');
         expect(p.host.state, MidiNetworkConnectionState.disconnected);
         expect(
-          sentOf<MidiNetworkMidi2AuthenticationRequired>(
-            toClient,
-          ).map((c) => c.authenticationState),
+          sentOf<MidiNetworkMidi2AuthenticationRequired>(toClient)
+              .map((c) => c.authenticationState),
           equals([
             MidiNetworkMidi2AuthenticationRequired.firstRequest,
             MidiNetworkMidi2AuthenticationRequired.incorrectDigest,
@@ -622,9 +621,8 @@ void main() {
       test('answers repeated invitations of an established client', () async {
         final p = pair(credentials: secret, requiredSecret: secret);
         await p.client.invite();
-        final accepted = sentOf<MidiNetworkMidi2InvitationAccepted>(
-          toClient,
-        ).length;
+        final accepted = sentOf<MidiNetworkMidi2InvitationAccepted>(toClient)
+            .length;
         p.host.handle([
           const MidiNetworkMidi2Invitation(
             endpointName: 'Client',
@@ -1106,9 +1104,8 @@ void main() {
           ]),
         );
         final outbox = <List<MidiNetworkMidi2Command>>[];
-        single(
-          outbox: outbox,
-        ).handle([MidiNetworkMidi2UnknownCommand(code: 0x55)]);
+        single(outbox: outbox)
+            .handle([MidiNetworkMidi2UnknownCommand(code: 0x55)]);
         expect(outbox, isEmpty);
       });
 
