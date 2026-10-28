@@ -38,12 +38,12 @@ void main() {
 
   const responderHost = MidiNetworkHostInfo(
     name: 'Responder host',
-    address: '10.0.0.2',
+    address: '192.0.2.2',
     port: 5004,
   );
   const initiatorHost = MidiNetworkHostInfo(
     name: 'Initiator host',
-    address: '10.0.0.1',
+    address: '192.0.2.1',
     port: 5004,
   );
 
@@ -570,9 +570,8 @@ void main() {
         timers.advance(const Duration(seconds: 1));
         expect(rtpCount(wire), 1);
         expect(
-          sent<MidiAppleMidiReceiverFeedback>(
-            wire.where((d) => !d.toResponder),
-          ).length,
+          sent<MidiAppleMidiReceiverFeedback>(wire.where((d) => !d.toResponder))
+              .length,
           1,
         );
         p.initiator.handleCommand(

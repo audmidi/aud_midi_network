@@ -22,19 +22,19 @@ void main() {
         ]) {
           final access = MidiNetworkAccess(
             policy: policy,
-            allowedPeers: {'Studio', '10.0.0.7', 'PIID'},
+            allowedPeers: {'Studio', '192.0.2.7', 'PIID'},
           );
-          expect(access.allows(name: 'Studio', address: '10.0.0.1'), isTrue);
-          expect(access.allows(name: 'Other', address: '10.0.0.7'), isTrue);
+          expect(access.allows(name: 'Studio', address: '192.0.2.1'), isTrue);
+          expect(access.allows(name: 'Other', address: '192.0.2.7'), isTrue);
           expect(
             access.allows(
               name: 'Other',
-              address: '10.0.0.1',
+              address: '192.0.2.1',
               productInstanceId: 'PIID',
             ),
             isTrue,
           );
-          expect(access.allows(name: 'Other', address: '10.0.0.1'), isFalse);
+          expect(access.allows(name: 'Other', address: '192.0.2.1'), isFalse);
         }
       });
 

@@ -157,9 +157,8 @@ class _Browse {
     final last = _reported;
     if (last != null &&
         last.length == hosts.length &&
-        Iterable<int>.generate(
-          hosts.length,
-        ).every((i) => last[i] == hosts[i])) {
+        Iterable<int>.generate(hosts.length)
+            .every((i) => last[i] == hosts[i])) {
       return;
     }
     _reported = hosts;

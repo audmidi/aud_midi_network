@@ -339,7 +339,11 @@ void main() {
         );
         await expectLater(
           backend.connect(
-            const MidiNetworkHostInfo(name: 'X', address: '1.2.3.4', port: 1),
+            const MidiNetworkHostInfo(
+              name: 'X',
+              address: '203.0.113.4',
+              port: 1,
+            ),
           ),
           throwsA(
             isA<StateError>().having(
@@ -350,7 +354,7 @@ void main() {
           ),
         );
         await backend.disconnect(
-          const MidiNetworkHostInfo(name: 'X', address: '1.2.3.4', port: 1),
+          const MidiNetworkHostInfo(name: 'X', address: '203.0.113.4', port: 1),
         );
         await backend.start(_Host());
         await expectLater(backend.start(_Host()), throwsA(isA<StateError>()));

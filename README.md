@@ -1,20 +1,119 @@
 # aud_midi_network
 
-Network MIDI sessions in Dart: AppleMIDI on top of aud_midi_rtp and Network MIDI 2.0, both over UDP with mDNS discovery.
+English | [Deutsch](README.de.md)
+
+AppleMIDI and Network MIDI 2.0 sessions over UDP with mDNS discovery.
+Network MIDI sessions in Dart: AppleMIDI on top of aud_midi_rtp and
+Network MIDI 2.0, both over UDP. Pure Dart on `dart:io`
+(`RawDatagramSocket`); runs on macOS, Linux, Windows and Android, without
+Flutter.
 
 Part of the aud_midi family, see [aud_midi](https://github.com/audmidi/aud_midi).
 
-## Goals
+## Motivation
+
+Other apps and devices should see an app built on the aud_midi family as
+a MIDI device of its own — on the network as a session that a DAW on
+another machine connects to and exchanges notes with, without a cable
+adapter. This package provides those sessions in pure Dart, so every
+platform without a network MIDI driver of its own gets them from the same
+code, with losses repaired instead of ignored:
 
 - AppleMIDI sessions: invitation, clock sync, feedback, reconnection
 - Network MIDI 2.0 (UDP) with FEC and retransmission
 - mDNS browsing, advertising through OS registrars
 - Lossy UDP proxy for tests
 
-## State
+## Installation
 
-Pure Dart on `dart:io` (`RawDatagramSocket`); runs on macOS, Linux,
-Windows and Android, without Flutter.
+```bash
+dart pub add aud_midi_network
+```
+
+Firewall and permissions: inbound UDP on the control and data port
+(5004 and 5005 by default) or on the Network MIDI 2.0 port, and mDNS
+(UDP 5353, multicast). iOS: `NSLocalNetworkUsageDescription`,
+`NSBonjourServices` with `_apple-midi._udp` and `_midi2._udp`. macOS
+sandbox: `com.apple.security.network.client` and
+`com.apple.security.network.server`; macOS 15+ asks for local network
+access. Android: `INTERNET`, `CHANGE_WIFI_MULTICAST_STATE`,
+`ACCESS_WIFI_STATE` and a `MulticastLock` for mDNS. Windows: a firewall
+prompt for the UDP ports; MSIX needs `internetClient` and
+`privateNetworkClientServer`. Linux sandboxes: Snap `network` and
+`avahi-control`, Flatpak `--system-talk-name=org.freedesktop.Avahi`.
+
+## Usage
+
+Two AppleMIDI sessions on one machine: the stage invites the studio and
+plays a note, the studio receives it over RTP-MIDI.
+
+```dart
+import 'package:aud_midi_core/aud_midi_core.dart';
+import 'package:aud_midi_network/aud_midi_network.dart';
+import 'package:aud_midi_standard/aud_midi_standard.dart';
+
+Future<void> main() async {
+  // Two AppleMIDI sessions on this machine; the system picks the ports
+  final studio = MidiAppleMidiSession(localName: 'Studio', requestedPort: 0);
+  final stage = MidiAppleMidiSession(localName: 'Stage', requestedPort: 0);
+  await studio.open();
+  await stage.open();
+  final received = studio.received.first;
+
+  // The stage invites the studio and plays a note once it is connected
+  final connection = await stage.connect(
+    MidiNetworkHostInfo(
+      name: studio.localName,
+      address: '127.0.0.1',
+      port: studio.port,
+    ),
+  );
+  print('${connection.remoteName}: ${connection.state.name}');
+  const clock = MidiSystemClock();
+  await connection.send(
+    MidiBytesPacket(bytes: MidiBytes([0x90, 60, 100]), time: clock.now()),
+  );
+
+  // The studio receives it over RTP-MIDI
+  final (connection: from, :packet) = await received;
+  print('${from.remoteName} sent $packet');
+
+  await stage.close();
+  await studio.close();
+}
+```
+
+It prints:
+
+```text
+Studio: connected
+Stage sent MidiBytesPacket(bytes: 90 3c 64, time: 171444144688)
+```
+
+The time is the package clock of this run.
+
+## Limitations
+
+- Advertising is not part of this package: it goes through a
+  `MidiServiceAdvertiser` of an OS backend. The package only browses.
+- Interoperability: AppleMIDI follows the wire format of Apple's driver
+  and RFC 6295; `test/apple_midi/midi_apple_midi_interop_test.dart` joins
+  the macOS network session ("Session 1") but only runs with
+  `AUD_MIDI_TEST_APPLE_INTEROP=1`, because enabling that session changes a
+  global setting — it has not run yet. Network MIDI 2.0 follows the
+  Zephyr and Windows MIDI Services implementations; no other
+  implementation was tested yet.
+- Windows: on the Windows machine of ticket 38 a Dart process lost most
+  UDP datagrams it sent, and `multicast_dns` could not join its group;
+  until ticket 39 settles both, the tests that need every datagram or
+  multicast skip on Windows.
+
+## Documentation
+
+- [Guides](doc/guides/)
+- The plan in [aud_midi_pm](https://github.com/audmidi/aud_midi_pm/blob/main/doc/2026-Q4/tickets/2026-10-06-aud_midi_01-initial-midi-implementation.md)
+
+## How it works
 
 - **AppleMIDI** (`MidiAppleMidiSession`, `MidiAppleMidiConnection`): the
   session protocol of Apple's network driver on a control port and the
@@ -56,9 +155,13 @@ Windows and Android, without Flutter.
 - **Tests**: `MidiLossyUdpProxy` forwards UDP between endpoints with
   seeded loss, burst loss, reordering, duplication and delay.
 
+## Status
+
+Before 1.0 — the API may change between minor versions.
+
 Verified on macOS 27 (Apple silicon) with real UDP on localhost; 269
-tests (the interop test below is skipped by default), every file covered
-100 % by its own test:
+tests (the interop test is skipped by default, see Limitations), every
+file covered 100 % by its own test:
 
 | Check | Result |
 | --- | --- |
@@ -72,37 +175,10 @@ tests (the interop test below is skipped by default), every file covered
 | FEC without retransmission, 3 of 10 data datagrams dropped | gaps reported as losses |
 | Authentication digests | the examples of M2-124-UM 6.9 and 6.10 |
 
-Interoperability: AppleMIDI follows the wire format of Apple's driver
-and RFC 6295; `test/apple_midi/midi_apple_midi_interop_test.dart` joins
-the macOS network session ("Session 1") but only runs with
-`AUD_MIDI_TEST_APPLE_INTEROP=1`, because enabling that session changes a
-global setting — it has not run yet. Network MIDI 2.0 follows the
-Zephyr and Windows MIDI Services implementations; no other
-implementation was tested yet.
-
-Firewall and permissions: inbound UDP on the control and data port
-(5004 and 5005 by default) or on the Network MIDI 2.0 port, and mDNS
-(UDP 5353, multicast). iOS: `NSLocalNetworkUsageDescription`,
-`NSBonjourServices` with `_apple-midi._udp` and `_midi2._udp`. macOS
-sandbox: `com.apple.security.network.client` and
-`com.apple.security.network.server`; macOS 15+ asks for local network
-access. Android: `INTERNET`, `CHANGE_WIFI_MULTICAST_STATE`,
-`ACCESS_WIFI_STATE` and a `MulticastLock` for mDNS. Windows: a firewall
-prompt for the UDP ports; MSIX needs `internetClient` and
-`privateNetworkClientServer`. On the Windows machine of ticket 38 a Dart
-process lost most UDP datagrams it sent, and `multicast_dns` could not join
-its group; until ticket 39 settles both, the tests that need every datagram
-or multicast skip on Windows. Linux sandboxes: Snap `network` and
-`avahi-control`, Flatpak `--system-talk-name=org.freedesktop.Avahi`.
-
-See the plan in [aud_midi_pm](https://github.com/audmidi/aud_midi_pm/blob/main/doc/2026-Q4/tickets/2026-10-06-aud_midi_01-initial-midi-implementation.md).
-
-## Installation
-
-```bash
-dart pub add aud_midi_network
-```
-
 ## Contributing
 
 See [doc/guides/develop-guide.md](doc/guides/develop-guide.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
