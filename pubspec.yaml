@@ -19,6 +19,6 @@ dev_dependencies:
 dependencies:
   aud_midi_core: ^0.2.0
   aud_midi_rtp: ^0.2.0
-  aud_midi_standard: ^0.3.0
+  aud_midi_standard: ^0.3.1
   crypto: ^3.0.8
   multicast_dns: ^0.3.3+1
